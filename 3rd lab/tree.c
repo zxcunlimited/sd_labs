@@ -6,6 +6,8 @@
 #include <locale.h>
 #include <Windows.h>
 
+void menu(); //the definition of function to it work in every other function
+
 typedef struct Date {
 	int hour;
 	int minute;
@@ -48,11 +50,11 @@ int foolproof(Date* date, char symbol_date[20]) { //date in format: HH:MM DD.MM.
 		return 1;
 		//call date input again
 	}
-	if ((month == 2) && ((year % 4 == 0) && (year / 100 != 0) || (year / 400 != 0))) {
+	if ((month == 2) && ((year % 4 == 0) && (year % 100 == 0) || (year % 400 == 0))) {
 		correct = 29;
 	}
 	else correct = month_days[month - 1];
-	if (!((day >= 1 && day < correct) && (month >= 1 && month < 13) && year >= 0)) {
+	if (!((day >= 1 && day <= correct) && (month >= 1 && month < 13) && year >= 0)) {
 		printf("Пожалуйста, введите дату корректно!\n");
 		return 1;
 	}   //call date input again
@@ -309,19 +311,29 @@ void add() {
 		flag = foolproof(&temp.date, temp_date);
 	}
 	weekday_counter(&temp.date);
-	printf("\nВведите описание события: ");
+	printf("Введите описание события: ");
 	fgets(temp.description, sizeof(temp.description), stdin);
-	printf("\nВведите место события: ");
+	printf("Введите место события: ");
 	fgets(temp.place, sizeof(temp.place), stdin);
-	flag = 1;
-	while (flag) {
-		printf("\nВведите важность события от 0 до 10: ");
-		scanf("%hu\n", &temp.importance);
+	flag = 0;
+	while (!flag) {
+		printf("Введите важность события от 0 до 10: ");
+		scanf("%hu", &temp.importance);
 		flag = (temp.importance >= 0 && temp.importance <= 10);
 	}
 	date_tree = insert_date(date_tree, temp);
 	importance_tree = insert_importance(importance_tree, temp);
-	printf("Новое событие было добавлено в записную книгу\n");
+	printf("\nНовое событие было добавлено в записную книгу\n");
+}
+
+void print_event(B_tree* t) {
+	printf("---------------------------------------------\n");
+	printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
+	printf("День недели: %s\n", t->note.date.weekday);
+	printf("Место: %s", t->note.place);
+	printf("Важность: %hu\n", t->note.importance);
+	printf("Описание: %s", t->note.description);
+	printf("---------------------------------------------\n");
 }
 
 B_tree* find_replacement(B_tree* t) {
@@ -364,6 +376,8 @@ B_tree* delete_node_date(B_tree* t, Date date) {
 	else if (cmp_res == 1) //val > t->val
 		t->right = delete_node_date(t->right, date);
 	else {
+		printf("Событие, которое будет удалено:\n");
+		print_event(t);
 		//node was found, now we are regard three events: node have only left subtree, node have only right subtree, and if node have them all, we need to find a replacement
 		delete_importance = t->note.importance;
 		if (t->left == NULL) {
@@ -415,16 +429,6 @@ B_tree* delete_node_importance(B_tree* t, Date date) {
 	return rebalance(t);
 }
 
-void print_event(B_tree* t) {
-	printf("---------------------------------------------\n");
-	printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
-	printf("День недели: %s\n", t->note.date.weekday);
-	printf("Место: %s\n", t->note.place);
-	printf("Важность: %hu\n", t->note.importance);
-	printf("Описание: %s\n", t->note.description);
-	printf("---------------------------------------------\n");
-}
-
 //in importance we will do negative in-order to go from biggest importance to lowest
 void importance_output(B_tree* t) {
 	if (t != NULL) {
@@ -433,6 +437,7 @@ void importance_output(B_tree* t) {
 		importance_output(t->left);
 	}
 }
+
 //in date we weiil realize default in-order to go from the earliest to the last date
 void date_output(B_tree* t) {
 	if (t != NULL) {
@@ -450,6 +455,13 @@ void free_tree(B_tree* t) {
 	free(t);
 }
 
+void empty_check(B_tree* t) {
+	if (date_tree == NULL) {
+		printf("В книжке нет событий!\n");
+		menu();
+	}
+}
+
 void menu() {
 	printf("\t-----------Меню:-------------------------\n"
 		   "\t| 1. Добавить запись                    |\n"
@@ -464,11 +476,18 @@ void menu() {
 	       "\t Введите действие: ");
 	unsigned short option;
 	scanf("%hu", &option);
+	int ch;
+	while ((ch = getchar()) != '\n' && ch != EOF) {}
 	switch (option) {
 	case 0: exit(0);
 	case 1: add();
+		menu();
 		break;
 	case 2: {
+		if (date_tree == NULL) {
+			empty_check(date_tree);
+			break;
+		}
 		char temp_date[20];
 		Date temp;
 		printf("Введите дату события, которое хотите удалить: ");
@@ -476,11 +495,27 @@ void menu() {
 		foolproof(&temp, temp_date);
 		date_tree = delete_node_date(date_tree, temp);
 		importance_tree = delete_node_importance(importance_tree, temp);
+		menu();
+		break;
 	}
-	case 3: importance_output(importance_tree);
+	case 3: {
+		if (date_tree == NULL) {
+			empty_check(date_tree);
+			break;
+		}
+		importance_output(importance_tree);
+		menu();
 		break;
-	case 4:date_output(date_tree);
+	}
+	case 4: {
+		if (date_tree == NULL) {
+			empty_check(date_tree);
+			break;
+		}
+		date_output(date_tree);
+		menu();
 		break;
+	}
 	case 5:
 
 	case 6:
@@ -490,6 +525,7 @@ void menu() {
 	default: 
 		printf("Неверно введенное действие!\n");
 		menu();
+		break;
 	}
 }
 
