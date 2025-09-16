@@ -45,7 +45,7 @@ B_tree* date_tree = NULL;
 
 
 //function to convert char in int and check if date input was incorrect
-int foolproof(Date* date, char symbol_date[16]) { //date in format: HH:MM DD.MM.YYYY
+int foolproof(Date* date, char symbol_date[20]) { //date in format: HH:MM DD.MM.YYYY
 	int hour, minute, day, month, year;
 	short correct;
 	const short month_days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
@@ -114,17 +114,12 @@ int check_height(B_tree* n) {
 }
 
 int compare_dates(Date* a, Date* b) {
-	if (a->year > b->year) return 1;
-	else return 0;
-	if (a->month > b->month) return 1;
-	else return 0;
-	if (a->day > b->day) return 1;
-	else return 0;
-	if (a->hour > b->hour) return 1;
-	else return 0;
-	if (a->minute > b->minute) return 1; 
-	else if (a->minute < b->minute) return 0;
-	return -1;
+	if (a->year != b->year) return (a->year > b->year) ? 1 : -1;
+    if (a->month != b->month) return (a->month > b->month) ? 1 : -1;
+    if (a->day != b->day) return (a->day > b->day) ? 1 : -1;
+    if (a->hour != b->hour) return (a->hour > b->hour) ? 1 : -1;
+    if (a->minute != b->minute) return (a->minute > b->minute) ? 1 : -1;
+    return 0; //if dates are equal (that can be true only when we delete node) we need to return smth
 }
 
 int BF(B_tree* t) {
@@ -265,7 +260,7 @@ B_tree* insert_importance(B_tree* t, event n) {
 B_tree* insert_date(B_tree* t, event n) {
 	if (t == NULL) return create_node(n);
 	short compare = compare_dates(&n.date, &t->note.date);
-	if (compare == 0) {
+	if (compare == -1) {
 		printf("left\n");
 		t->left = insert_date(t->left, n);
 	}
@@ -281,7 +276,7 @@ B_tree* insert_date(B_tree* t, event n) {
 
 	int balance = BF(t);
 	//LL
-	if (balance > 1 && compare_dates(&n.date, &t->left->note.date) == 0) { //val < t->left->value
+	if (balance > 1 && compare_dates(&n.date, &t->left->note.date) == -1) { //val < t->left->value
 		return R_rotate(t);
 	}
 	//LR
@@ -294,7 +289,7 @@ B_tree* insert_date(B_tree* t, event n) {
 		return L_rotate(t);
 	}
 	//RL
-	if (balance < -1 && compare_dates(&n.date, &t->right->note.date) == 0) { //val < t->right->value
+	if (balance < -1 && compare_dates(&n.date, &t->right->note.date) == -1) { //val < t->right->value
 		t->right = R_rotate(t->right);
 		return L_rotate(t);
 	}
@@ -333,13 +328,14 @@ B_tree* find_replacement(B_tree* t) {
 	return t;
 }
 
-B_tree* delete_node(B_tree* t, Date date) {
+B_tree* delete_node_date(B_tree* t, Date date) {
+	int cmp_res = compare_dates(&date, &t->note.date);
 	if (t == NULL)
 		return t;
-	if (!compare_dates(&date, &t->note.date))  //val < t->val
-		t->left = delete_node(t->left, date);
-	else if (compare_dates(&date, &t->note.date)) //val > t->val
-		t->right = delete_node(t->right, date);
+	if (cmp_res == -1)  //val < t->val
+		t->left = delete_node_date(t->left, date);
+	else if (cmp_res == 1) //val > t->val
+		t->right = delete_node_date(t->right, date);
 	else {
 		//node was found, now we are regard three events: node have only left subtree, node have only right subtree, and if node have them all, we need to find a replacement
 		if (t->left == NULL) {
@@ -355,8 +351,30 @@ B_tree* delete_node(B_tree* t, Date date) {
 		//event when node have 2 subtrees
 		B_tree* temp = find_replacement(t->right); //we are trying to find min in right subtree
 		t->note = temp->note;
-		t->right = delete_node(t->right, temp->note.date);
+		t->right = delete_node_date(t->right, temp->note.date);
 	}
+	//now when we deleted right node, we need to check if our balance is still correct
+	
+	t->height = max(check_height(t->left), check_height(t->right)) + 1;
+	int balance = BF(t);
+
+	//LL
+	if (balance > 1 && BF(t->left) >= 0)
+		return R_rotate(t);
+	//LR
+	if (balance > 1 && BF(t->left) < 0) {
+		t->left = L_rotate(t->left);
+		return R_rotate(t);
+	}
+	//RR
+	if (balance < -1 && BF(t->right) <= 0)
+		return L_rotate(t);
+	//RL
+	if (balance < -1 && BF(t->right) > 0) {
+		t->right = R_rotate(t->right);
+		return L_rotate(t);
+	}
+
 	return t;
 }
 
@@ -386,8 +404,15 @@ void menu() {
 	case 0: exit(0);
 	case 1: add();
 		break;
-	case 2:
-
+	case 2: {
+		char temp_date[20];
+		Date temp;
+		printf("¬ведите дату событи€, которое хотите удалить: ");
+		fgets(temp_date, sizeof(temp_date), stdin);
+		foolproof(&temp, temp_date);
+		date_tree = delete_node_date(date_tree, temp);
+		importance_tree = delete_node_importance(importance_tree, temp);
+	}
 	case 3:
 
 	case 4:
