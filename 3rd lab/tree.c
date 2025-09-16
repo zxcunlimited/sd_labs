@@ -6,15 +6,6 @@
 #include <locale.h>
 #include <Windows.h>
 
-
-/*
-если придется сортировать по важности то важным будет обход в ширину, так как сначала будут вноситься самые важные элементы
-при том желательно выполнять обход в ширину справа налево, скорее всего придется сортировать при том и по дате, которая будет являться вторичным критерием
-саму дату тоже надо будет оценивать - события, которые должны или произошли раньше - вставляются раньше всех, остальные идут позже, то есть 21:04 05.04.2025 будет вставляться раньше чем 21:05 05.04.2025
-
-плюс нужно ввести работу с файлами ведь книжка она на то и книжка что запоминает
-*/
-
 typedef struct Date {
 	int hour;
 	int minute;
@@ -126,6 +117,7 @@ int BF(B_tree* t) {
 	return t ? (check_height(t->left) - check_height(t->right)) : 0;
 }
 
+
 //we will not have initialization function because will do this in the main
 B_tree* create_node(event n) {
 	B_tree* node = (B_tree*)malloc(sizeof(B_tree));
@@ -228,6 +220,17 @@ B_tree* insert_importance(B_tree* t, event n) {
 		printf("right\n");
 		t->right = insert_importance(t->right, n);
 	}
+	else if (n.importance == t->note.importance) { //if importance is equal we need to compare by date
+		short compare = compare_dates(&n.date, &t->note.date);
+		if (compare == -1) {
+			printf("left\n");
+			t->left = insert_importance(t->left, n);
+		}
+		else if (compare == 1) {
+			printf("right\n");
+			t->right = insert_importance(t->right, n);
+		}
+	}
 	else { //no duplicates
 		return t;
 	}
@@ -328,33 +331,8 @@ B_tree* find_replacement(B_tree* t) {
 	return t;
 }
 
-B_tree* delete_node_date(B_tree* t, Date date) {
-	int cmp_res = compare_dates(&date, &t->note.date);
-	if (t == NULL)
-		return t;
-	if (cmp_res == -1)  //val < t->val
-		t->left = delete_node_date(t->left, date);
-	else if (cmp_res == 1) //val > t->val
-		t->right = delete_node_date(t->right, date);
-	else {
-		//node was found, now we are regard three events: node have only left subtree, node have only right subtree, and if node have them all, we need to find a replacement
-		if (t->left == NULL) {
-			B_tree* temp = t->right;
-			free(t);
-			return temp;
-		}
-		else if (t->right == NULL) {
-			B_tree* temp = t->left;
-			free(t);
-			return temp;
-		}
-		//event when node have 2 subtrees
-		B_tree* temp = find_replacement(t->right); //we are trying to find min in right subtree
-		t->note = temp->note;
-		t->right = delete_node_date(t->right, temp->note.date);
-	}
-	//now when we deleted right node, we need to check if our balance is still correct
-	
+B_tree* rebalance(B_tree* t) {
+	if (t == NULL) return NULL;
 	t->height = max(check_height(t->left), check_height(t->right)) + 1;
 	int balance = BF(t);
 
@@ -374,8 +352,68 @@ B_tree* delete_node_date(B_tree* t, Date date) {
 		t->right = R_rotate(t->right);
 		return L_rotate(t);
 	}
-
 	return t;
+}
+
+unsigned short delete_importance;
+B_tree* delete_node_date(B_tree* t, Date date) {
+	int cmp_res = compare_dates(&date, &t->note.date);
+	if (t == NULL)
+		return t;
+	if (cmp_res == -1)  //val < t->val
+		t->left = delete_node_date(t->left, date);
+	else if (cmp_res == 1) //val > t->val
+		t->right = delete_node_date(t->right, date);
+	else {
+		//node was found, now we are regard three events: node have only left subtree, node have only right subtree, and if node have them all, we need to find a replacement
+		delete_importance = t->note.importance;
+		if (t->left == NULL) {
+			B_tree* temp = t->right;
+			free(t);
+			return temp;
+		}
+		else if (t->right == NULL) {
+			B_tree* temp = t->left;
+			free(t);
+			return temp;
+		}
+		//event when node have 2 subtrees
+		B_tree* temp = find_replacement(t->right); //we are trying to find min in right subtree
+		t->note = temp->note;
+		t->right = delete_node_date(t->right, temp->note.date);
+	}
+	//now when we deleted right node, we need to check if our balance is still correct
+	return rebalance(t);
+}
+
+//to delete a node from importance tree we need to know what importance have our event, thats why we will remember it while deleting node by date
+B_tree* delete_node_importance(B_tree* t, Date date) {
+	if (t == NULL) return t;
+	else if (delete_importance < t->note.importance) t->left = delete_node_importance(t->left, date);
+	else if (delete_importance > t->note.importance) t->right = delete_node_importance(t->right, date);
+	else { //if importance !> && !< => we found node that we need to delete
+		int cmp_res = compare_dates(&date, &t->note.date);
+		if (cmp_res == -1) t->left = delete_node_importance(t->left, date);
+		else if (cmp_res == 1) t->right = delete_node_importance(t->right, date);
+		else {
+			//node was found, now we are regard three events: node have only left subtree, node have only right subtree, and if node have them all, we need to find a replacement
+			if (t->left == NULL) {
+				B_tree* temp = t->right;
+				free(t);
+				return temp;
+			}
+			else if (t->right == NULL) {
+				B_tree* temp = t->left;
+				free(t);
+				return temp;
+			}
+			//event when node have 2 subtrees
+			B_tree* temp = find_replacement(t->right); //we are trying to find min in right subtree
+			t->note = temp->note;
+			t->right = delete_node_importance(t->right, temp->note.date);
+		}
+	}
+	return rebalance(t);
 }
 
 void free_tree(B_tree* t) {
