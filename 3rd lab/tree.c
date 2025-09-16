@@ -25,7 +25,6 @@ typedef struct event{
 //binary tree realization
 typedef struct B_tree{
 	event note;
-	int value;
 	struct B_tree* left; //pointer on left subtree
 	struct B_tree* right; //pointer on right subtree
 	int height; 
@@ -416,6 +415,22 @@ B_tree* delete_node_importance(B_tree* t, Date date) {
 	return rebalance(t);
 }
 
+//in importance we will do negative in-order to go from biggest importance to lowest
+void importance_output(B_tree* t) {
+	if (t != NULL) {
+		importance_output(t->right);
+		printf("---------------------------------------------\n");
+		printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
+		printf("День недели: %s\n", t->note.date.weekday);
+		printf("Место: %s\n", t->note.place);
+		printf("Важность: %hu\n", t->note.importance);
+		printf("Описание: %s\n", t->note.description);
+		printf("---------------------------------------------\n");
+		importance_output(t->left);
+	}
+}
+
+
 void free_tree(B_tree* t) {
 	if (t != NULL) {
 		free_tree(t->right);
@@ -451,8 +466,8 @@ void menu() {
 		date_tree = delete_node_date(date_tree, temp);
 		importance_tree = delete_node_importance(importance_tree, temp);
 	}
-	case 3:
-
+	case 3: importance_output(importance_tree);
+		break;
 	case 4:
 
 	case 5:
