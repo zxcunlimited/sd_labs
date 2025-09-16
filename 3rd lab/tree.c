@@ -415,21 +415,32 @@ B_tree* delete_node_importance(B_tree* t, Date date) {
 	return rebalance(t);
 }
 
+void print_event(B_tree* t) {
+	printf("---------------------------------------------\n");
+	printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
+	printf("День недели: %s\n", t->note.date.weekday);
+	printf("Место: %s\n", t->note.place);
+	printf("Важность: %hu\n", t->note.importance);
+	printf("Описание: %s\n", t->note.description);
+	printf("---------------------------------------------\n");
+}
+
 //in importance we will do negative in-order to go from biggest importance to lowest
 void importance_output(B_tree* t) {
 	if (t != NULL) {
 		importance_output(t->right);
-		printf("---------------------------------------------\n");
-		printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
-		printf("День недели: %s\n", t->note.date.weekday);
-		printf("Место: %s\n", t->note.place);
-		printf("Важность: %hu\n", t->note.importance);
-		printf("Описание: %s\n", t->note.description);
-		printf("---------------------------------------------\n");
+		print_event(t);
 		importance_output(t->left);
 	}
 }
-
+//in date we weiil realize default in-order to go from the earliest to the last date
+void date_output(B_tree* t) {
+	if (t != NULL) {
+		date_output(t->left);
+		print_event(t);
+		date_output(t->right);
+	}
+}
 
 void free_tree(B_tree* t) {
 	if (t != NULL) {
@@ -468,8 +479,8 @@ void menu() {
 	}
 	case 3: importance_output(importance_tree);
 		break;
-	case 4:
-
+	case 4:date_output(date_tree);
+		break;
 	case 5:
 
 	case 6:
