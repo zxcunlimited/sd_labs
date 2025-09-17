@@ -35,7 +35,6 @@ typedef struct B_tree{
 B_tree* importance_tree = NULL;
 B_tree* date_tree = NULL;
 
-
 //function to convert char in int and check if date input was incorrect
 int foolproof(Date* date, char symbol_date[20]) { //date in format: HH:MM DD.MM.YYYY
 	int hour, minute, day, month, year;
@@ -366,6 +365,13 @@ B_tree* rebalance(B_tree* t) {
 	return t;
 }
 
+void empty_check(B_tree* t) {
+	if (date_tree == NULL) {
+		printf("В книжке нет событий!\n");
+		menu();
+	}
+}
+
 unsigned short delete_importance;
 B_tree* delete_node_date(B_tree* t, Date date) {
 	int cmp_res = compare_dates(&date, &t->note.date);
@@ -429,6 +435,19 @@ B_tree* delete_node_importance(B_tree* t, Date date) {
 	return rebalance(t);
 }
 
+void full_delete() {
+	if (date_tree == NULL) {
+		empty_check(date_tree);
+	}
+	char temp_date[20];
+	Date temp;
+	printf("Введите дату события, которое хотите удалить: ");
+	fgets(temp_date, sizeof(temp_date), stdin);
+	foolproof(&temp, temp_date);
+	date_tree = delete_node_date(date_tree, temp);
+	importance_tree = delete_node_importance(importance_tree, temp);
+}
+
 //in importance we will do negative in-order to go from biggest importance to lowest
 void importance_output(B_tree* t) {
 	if (t != NULL) {
@@ -438,13 +457,42 @@ void importance_output(B_tree* t) {
 	}
 }
 
-//in date we weiil realize default in-order to go from the earliest to the last date
+//in date we wiil realize default in-order to go from the earliest to the last date
 void date_output(B_tree* t) {
 	if (t != NULL) {
 		date_output(t->left);
 		print_event(t);
 		date_output(t->right);
 	}
+}
+unsigned short flag = 0;
+
+void find_place(B_tree* t, const char* place) {
+	if (t != NULL) {
+		if (strcmp(t->note.place, place) == 0) {
+			print_event(t);
+			flag = 1;
+		}
+		find_place(t->left, place);
+		find_place(t->right, place);
+	}
+}
+
+void place_output(B_tree* t) {
+	char temp_place[50];
+	printf("Введите место: ");
+	fgets(temp_place, sizeof(temp_place), stdin);
+	find_place(t, temp_place);
+	if (flag == 0) printf("Нет события в таком месте\n");
+}
+
+//the event in notebook format: HH:MM DD:MM:YYYY, description, place, importance\n
+void read_file() {
+
+}
+
+void write_file() {
+
 }
 
 void free_tree(B_tree* t) {
@@ -453,13 +501,6 @@ void free_tree(B_tree* t) {
 		free_tree(t->left);
 	}
 	free(t);
-}
-
-void empty_check(B_tree* t) {
-	if (date_tree == NULL) {
-		printf("В книжке нет событий!\n");
-		menu();
-	}
 }
 
 void menu() {
@@ -484,44 +525,39 @@ void menu() {
 		menu();
 		break;
 	case 2: {
-		if (date_tree == NULL) {
-			empty_check(date_tree);
-			break;
-		}
-		char temp_date[20];
-		Date temp;
-		printf("Введите дату события, которое хотите удалить: ");
-		fgets(temp_date, sizeof(temp_date), stdin);
-		foolproof(&temp, temp_date);
-		date_tree = delete_node_date(date_tree, temp);
-		importance_tree = delete_node_importance(importance_tree, temp);
+		full_delete();
 		menu();
 		break;
 	}
 	case 3: {
-		if (date_tree == NULL) {
-			empty_check(date_tree);
-			break;
-		}
+		empty_check(date_tree);
 		importance_output(importance_tree);
 		menu();
 		break;
 	}
 	case 4: {
-		if (date_tree == NULL) {
-			empty_check(date_tree);
-			break;
-		}
+		empty_check(date_tree);
 		date_output(date_tree);
 		menu();
 		break;
 	}
-	case 5:
+	case 5: {
+		empty_check(date_tree);
+		place_output(date_tree);
+		menu();
+		break;
+	}
 
-	case 6:
-
-	case 7:
-
+	case 6: {
+		read_file();
+		menu();
+		break;
+	}
+	case 7:{
+		write_file();
+		menu();
+		break;
+	}
 	default: 
 		printf("Неверно введенное действие!\n");
 		menu();
