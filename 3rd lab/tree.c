@@ -7,6 +7,8 @@
 #include <Windows.h>
 
 void menu(); //the definition of function to it work in every other function
+int count = 0; //global var to count how many events we have in our tree
+
 
 typedef struct Date {
 	int hour;
@@ -117,6 +119,12 @@ int BF(B_tree* t) {
 	return t ? (check_height(t->left) - check_height(t->right)) : 0;
 }
 
+void clearing_n(char* str) {
+	size_t len = strlen(str);
+	if (len > 0 && str[len - 1] == '\n') {
+		str[len - 1] = '\0';
+	}
+}
 
 //we will not have initialization function because will do this in the main
 B_tree* create_node(event n) {
@@ -213,21 +221,17 @@ B_tree* insert(B_tree* t, int val, event n) {
 B_tree* insert_importance(B_tree* t, event n) {
 	if (t == NULL) return create_node(n);
 	if (n.importance < t->note.importance) {
-		printf("left\n");
 		t->left = insert_importance(t->left, n);
 	}
 	else if (n.importance > t->note.importance) {
-		printf("right\n");
 		t->right = insert_importance(t->right, n);
 	}
 	else if (n.importance == t->note.importance) { //if importance is equal we need to compare by date
 		short compare = compare_dates(&n.date, &t->note.date);
 		if (compare == -1) {
-			printf("left\n");
 			t->left = insert_importance(t->left, n);
 		}
 		else if (compare == 1) {
-			printf("right\n");
 			t->right = insert_importance(t->right, n);
 		}
 	}
@@ -264,17 +268,15 @@ B_tree* insert_date(B_tree* t, event n) {
 	if (t == NULL) return create_node(n);
 	short compare = compare_dates(&n.date, &t->note.date);
 	if (compare == -1) {
-		printf("left\n");
 		t->left = insert_date(t->left, n);
 	}
 	else if (compare == 1) {
-		printf("right\n");
 		t->right = insert_date(t->right, n);
 	}
 	else {
 		return t;
 	}
-
+	count++;
 	t->height = max(check_height(t->left), check_height(t->right)) + 1;
 
 	int balance = BF(t);
@@ -312,8 +314,10 @@ void add() {
 	weekday_counter(&temp.date);
 	printf("Введите описание события: ");
 	fgets(temp.description, sizeof(temp.description), stdin);
+	clearing_n(temp.description);
 	printf("Введите место события: ");
 	fgets(temp.place, sizeof(temp.place), stdin);
+	clearing_n(temp.place);
 	flag = 0;
 	while (!flag) {
 		printf("Введите важность события от 0 до 10: ");
@@ -329,9 +333,9 @@ void print_event(B_tree* t) {
 	printf("---------------------------------------------\n");
 	printf("Дата события: %d:%d %d.%d.%d\n", t->note.date.hour, t->note.date.minute, t->note.date.day, t->note.date.month, t->note.date.year);
 	printf("День недели: %s\n", t->note.date.weekday);
-	printf("Место: %s", t->note.place);
+	printf("Место: %s\n", t->note.place);
 	printf("Важность: %hu\n", t->note.importance);
-	printf("Описание: %s", t->note.description);
+	printf("Описание: %s\n", t->note.description);
 	printf("---------------------------------------------\n");
 }
 
@@ -482,17 +486,68 @@ void place_output(B_tree* t) {
 	char temp_place[50];
 	printf("Введите место: ");
 	fgets(temp_place, sizeof(temp_place), stdin);
+	clearing_n(temp_place);
 	find_place(t, temp_place);
 	if (flag == 0) printf("Нет события в таком месте\n");
 }
 
 //the event in notebook format: HH:MM DD:MM:YYYY, description, place, importance\n
 void read_file() {
+	FILE* file = fopen("notebook.txt", "r");
+	if (file == NULL) {
+		printf("Ошибка открытия файла.\n");
+		return;
+	}
 
+	char buffer[200]; //20 + 100 + 50 + 30 additional
+	while (fscanf(file, "%20[^,],", buffer) == 1) {
+		event temp_event;
+		foolproof(&temp_event.date, buffer);
+		weekday_counter(&temp_event.date);
+		fscanf(file, "%100[^,],", temp_event.description);
+		clearing_n(temp_event.description);
+		fscanf(file, "%50[^,],", temp_event.place);
+		clearing_n(temp_event.place);
+		fscanf(file, "%hu", &temp_event.importance);
+		date_tree = insert_date(date_tree, temp_event);
+		importance_tree = insert_importance(importance_tree, temp_event);
+	}
+
+	fclose(file);
+	printf("События загружены из файла успешно\n");
 }
 
-void write_file() {
+void recurse_write(B_tree* t, FILE* file); //the definition for write_file to work correct
 
+void write_file() {
+	FILE* file = fopen("notebook.txt", "w");
+	if (file == NULL) {
+		printf("Ошибка открытия файла.\n");
+		return;
+	}
+	recurse_write(date_tree, file);
+	fclose(file);
+	printf("События сохранены в файл\n");
+}
+
+void recurse_write(B_tree* t, FILE* file) {
+	if (t == NULL) return;
+	recurse_write(t->left, file);
+	fprintf(file, "%02d:%02d %02d.%02d.%04d,%s,%s,%hu",
+		t->note.date.hour, //%02d is to full with zero's date if it <=9, for example if 04:05 it will be in int like 4:5 
+		t->note.date.minute,
+		t->note.date.day,
+		t->note.date.month,
+		t->note.date.year,
+		t->note.description,
+		t->note.place,
+		t->note.importance);
+	printf("%d\n", count);
+	if (count > 1) {
+		fprintf(file, "\n");
+		count--;
+	}
+	recurse_write(t->right, file);
 }
 
 void free_tree(B_tree* t) {
@@ -518,7 +573,7 @@ void menu() {
 	unsigned short option;
 	scanf("%hu", &option);
 	int ch;
-	while ((ch = getchar()) != '\n' && ch != EOF) {}
+	while ((ch = getchar()) != '\n' && ch != EOF) {} //fixing "\n" after choice
 	switch (option) {
 	case 0: exit(0);
 	case 1: add();
@@ -566,8 +621,8 @@ void menu() {
 }
 
 int main() {
-	setlocale(LC_ALL, "rus");
 	SetConsoleCP(1251);
 	SetConsoleOutputCP(1251);
+	setlocale(LC_ALL, "rus");
 	menu();
 }
