@@ -69,7 +69,7 @@ typedef struct Tokens {
 }Tokens;
 
 typedef struct node {
-	int value;
+	Tokens token;
 	struct node* next;
 }node;
 
@@ -83,25 +83,25 @@ typedef struct queue {
 }queue ;
 
 //functions to put a value in the struct (push to stack and en(ter)queue for queue)
-void push(stack* s, int val) {
+void push(stack* s, Tokens t) {
 	node* s_node = (node*)malloc(sizeof(node));
 	if (!s_node) {
 		printf("Memory allocation error!");
 		exit(0);
 	}
 	s_node->next = NULL;
-	s_node->value = val;
+	s_node->token = t;
 	s_node->next = s->top;
 	s->top = s_node;
 }
 
-void enqueue(queue* q, int val) {
+void enqueue(queue* q, Tokens t) {
 	node* q_node = (node*)malloc(sizeof(node));
 	if (!q_node) {
 		printf("Memory allocation error!");
 		exit(0);
 	}
-	q_node->value = val;
+	q_node->token = t;
 	q_node->next = NULL;
 	if (q->head == NULL)	q->head = q_node;
 	else q->tail->next = q_node;
@@ -109,35 +109,34 @@ void enqueue(queue* q, int val) {
 }
 
 //functions to get a value from struct (because stack work on LIFO and queue FIFO, the value gets from the top of the stack and from the head of the queue)
-int pop(stack* s) {
+Tokens pop(stack* s) {
 	if (s == NULL) {
 		printf("Стэк пустой!\n");
-		return 0;
+		exit(0);
 	}
 	node* temp = (node*)malloc(sizeof(node));
 	temp = s->top;
-	int x = temp->value;
+	Tokens x = temp->token;
 	s->top = temp->next;
 	free(temp);
 	return x;
 }
 
-int dequeue(queue* q) {
+Tokens dequeue(queue* q) {
 	if (q == NULL) {
 		printf("Очередь пуста!\n");
-		return 0;
+		exit(0);
 	}
 	node* temp = (node*)malloc(sizeof(node));
 	temp = q->head;
-	int x = temp->value;
+	Tokens x = temp->token;
 	q->head = temp->next;
 	if (q->head == NULL) q->tail = NULL; //with the queue its quite harder, we need to check if after our manipulations the head is empty, if it is we know that the whole queue is empty now and need to null the tail too
 	free(temp);
 	return x;
 }
 
-int tokenizer(const char* str) {
-	Tokens list[500];
+int tokenizer(const char* str, Tokens list[500]) {
 	int tokens_count = 0;
 	int i = 0;
 	while (str[i] != '\0') {
@@ -227,12 +226,73 @@ int tokenizer(const char* str) {
 	return tokens_count;
 }
 
+int get_priority(char operator) { //functions returns priority of operators that is important to shunting yard
+	if (operator == '!') return 4;
+	if (operator == '^') return 3;
+	if (operator == '*' || operator == '/') return 2;
+	if (operator == '+' || operator == '-') return 1;
+	return 0;
+}
+
+typedef enum associativity {left, right} associativity;
+//using enum ecxept of standart 0, 1 makes understading what associativity have operator easier
+associativity get_associativity(char operator) {
+	if (operator == '!' || operator == '^') return right;
+	return left;
+}
+
+void shunting_yard(queue* out, stack* oper_stack, Tokens list[500], int tokens_count) {
+	for (int i = 0; i < tokens_count; i++) 
+	{
+		if (list[i].type == numbers || list[i].type == variables) enqueue(out, list[i]);
+		else if (list[i].type == functions) 
+		{
+			push(oper_stack, list[i]);
+		}
+		else if (list[i].type == operators)
+		{ //подробное объяснение случая с операторами
+			if (oper_stack->top != NULL) //если вершина стека пуста то все просто - банально кладем новоприбывший оператор в стек
+			{  //если же нет, ситуация становится сложнее - нам нужно сравнить на приоритетность и ассоциативность новый и старый (в данный момент лежит на вершине стека)
+				while ((oper_stack->top->token.type == operators || oper_stack->top->token.type == functions) &&  //если на вершине стека оператор или функция - нужно провести сравнение по двум случаям
+					  (get_priority(oper_stack->top->token.text) > get_priority(list[i].text) ||  // 1 случай - новый оператор имеет приоритет меньше старого, тогда старый оператор переходит в очередь
+					  (get_priority(oper_stack->top->token.text) == get_priority(list[i].text) &&   // 2 случай - приоритеты равны, но тогда мы проводим проверку на ассоциативность
+					  get_associativity(list[i].text) == left))) // если новый оператор лево-ассоциативен, старый оператор идет в очередь
+				{
+					enqueue(out, pop(oper_stack));
+				}
+			}
+		}
+		else if (list[i].type == left_brace) push(oper_stack, list[i]);
+		else if (list[i].type == right_brace) 
+		{
+			while (oper_stack->top->token.type != left_brace) 
+			{
+				enqueue(out, pop(oper_stack));
+			}
+			pop(oper_stack);
+			if (oper_stack->top->token.type == functions) enqueue(out, pop(oper_stack));
+		}
+	}
+	while (oper_stack->top != NULL) enqueue(out, pop(oper_stack));
+}
+
 void solve() {
 	char str[1000];
+
+	//initializing all main structures
+	Tokens token_list[500];
+	stack* main_stack = (stack*)malloc(sizeof(stack));
+	main_stack->top = NULL;
+	queue* main_queue = (queue*)malloc(sizeof(queue));
+	main_queue->head = NULL;
+	main_queue->tail = NULL;
+
 	printf("Введите ваше выражение: ");
 	fgets(str, sizeof(str), stdin);
 	str[strcspn(str, "\n")] = '\0'; //another fixing of "\n", not getchar cause of using fgets except of scanf: strcspn find the first "\n" in str and replaces it with "\0"
-	tokenizer(str);
+	//main solving part
+	int tokens_count = tokenizer(str, token_list); //converting string into tokens
+	shunting_yard(main_queue, main_stack, token_list, tokens_count);
 }
 
 void print_func() {
@@ -248,14 +308,7 @@ int main() {
 	SetConsoleCP(1251);
 	SetConsoleOutputCP(1251);
 
-	//initializing all structures
-	//stack* main_stack = (stack*)malloc(sizeof(stack));
-	//main_stack->top = NULL;
-	//queue* main_queue = (queue*)malloc(sizeof(queue));
-	//main_queue->head = NULL;
-	//main_queue->tail = NULL;
 	unsigned short option;
-
 	while (TRUE) {
 		printf("\t-------------Меню-------------\n"
 			   "\t| 1. Ввести выражение        |\n"
