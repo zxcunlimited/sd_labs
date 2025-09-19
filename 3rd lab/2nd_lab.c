@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <locale.h>
-#include <math.h>
+#include <math.h> //standart math function 
+#include <ctype.h> //functions to check if string contains a digit or a symbol (isdigit, isalpha)
+#include <stdlib.h> //functions to convert str into digits
 
 /*
 план выполнения работы:
@@ -56,8 +58,8 @@ typedef enum token_types {
 	variables,
 	operators,
 	functions,
-	open_brace,
-	close_brace
+	left_brace,
+	right_brace
 }token_types;
 
 typedef struct Tokens {
@@ -129,17 +131,116 @@ int dequeue(queue* q) {
 	temp = q->head;
 	int x = temp->value;
 	q->head = temp->next;
-	if (q->head = NULL) q->tail = NULL; //with the queue its quite harder, we need to check if after our manipulations the head is empty, if it is we know that the whole queue is empty now and need to null the tail too
+	if (q->head == NULL) q->tail = NULL; //with the queue its quite harder, we need to check if after our manipulations the head is empty, if it is we know that the whole queue is empty now and need to null the tail too
 	free(temp);
 	return x;
 }
 
-void solve(stack* s, queue* q) {
+int tokenizer(const char* str) {
+	Tokens list[500];
+	int tokens_count = 0;
+	int i = 0;
+	while (str[i] != '\0') {
+
+		if (isspace(str[i]) != 0) { //if symbol is space - skip we dont need it
+			i++;
+			continue;
+		}
+		//braces
+		if (str[i] == '(') {
+			list[tokens_count++] = (Tokens){ left_brace, "(", 0 };
+			i++;
+		}
+		else if (str[i] == ')') {
+			list[tokens_count++] = (Tokens){ right_brace, ")", 0 };
+			i++;
+		}
+		//operators
+		else if (strchr("+-*/^!", str[i]) != NULL)
+		{
+			char operator[] = { str[i], '\0' };
+			list[tokens_count] = (Tokens){ operators, "", 0}; //we cant directy put operator in text because after leaving this function the pointer on char will disappear
+			strcpy(list[tokens_count].text, operator);
+			tokens_count++;
+			i++;
+		}
+
+		//digit
+		else if (isdigit(str[i]) || (str[i]) == '.' && isdigit(str[i + 1]))
+		{
+			char num_buf[32];
+			int j = 0;
+
+			// puting number in a buffer
+			while (isdigit(str[i]) || str[i] == '.') 
+			{
+				num_buf[j++] = str[i++];
+			}
+			num_buf[j] = '\0';
+
+			list[tokens_count].type = numbers;
+			strcpy(list[tokens_count].text, num_buf);
+			list[tokens_count].value = atof(num_buf); // atof - str to double | atoi - str to int
+			tokens_count++;
+		}
+
+		// symbols - they create functions or variables
+		else if (isalpha(str[i]))
+		{
+			char word_buf[16];
+			int j = 0;
+			while (isalpha(str[i]))
+			{
+				word_buf[j++] = str[i++];
+			}
+			word_buf[j] = '\0';
+
+			const char* funcs[] = { "sin", "cos", "tan", "cot", "arcsin", "arccos", "arctan", "arccot", "sqrt" };
+			int found = 0;
+
+			for (int i = 0; i < sizeof(funcs) / sizeof(funcs[0]); i++) {
+				if (strcmp(word_buf, funcs[i]) == 0) {
+					found = 1;
+					break;
+				}
+			}
+			if (found == 1) {
+				list[tokens_count].type = functions;
+				strcpy(list[tokens_count].text, word_buf);
+				tokens_count++;
+			}
+			else 
+			{
+				list[tokens_count].type = variables;
+				strcpy(list[tokens_count].text, word_buf);
+				tokens_count++;
+			}
+		}
+		// неизвестный символ
+		else 
+		{
+			printf("неизвестный символ: '%c'\n", str[i]);
+			i++;
+		}
+	}
+
+	return tokens_count;
+}
+
+void solve() {
 	char str[1000];
 	printf("Введите ваше выражение: ");
 	fgets(str, sizeof(str), stdin);
 	str[strcspn(str, "\n")] = '\0'; //another fixing of "\n", not getchar cause of using fgets except of scanf: strcspn find the first "\n" in str and replaces it with "\0"
-	printf("%s\n", str);
+	tokenizer(str);
+}
+
+void print_func() {
+	printf("\tСписок доступных функций:\n"
+	"\t sin, cos, tan, cot - тригонометрические функции\n"
+	"\t arcsin, arccos, arctan, arccot - обратные тригонометрические функции\n"
+	"\t sqrt - корень числа\n"
+	);
 }
 
 int main() {
@@ -148,25 +249,29 @@ int main() {
 	SetConsoleOutputCP(1251);
 
 	//initializing all structures
-	stack* main_stack = (stack*)malloc(sizeof(stack));
-	main_stack->top = NULL;
-	queue* main_queue = (queue*)malloc(sizeof(queue));
-	main_queue->head = NULL;
-	main_queue->tail = NULL;
+	//stack* main_stack = (stack*)malloc(sizeof(stack));
+	//main_stack->top = NULL;
+	//queue* main_queue = (queue*)malloc(sizeof(queue));
+	//main_queue->head = NULL;
+	//main_queue->tail = NULL;
 	unsigned short option;
 
 	while (TRUE) {
-		printf("\t-----------Меню-------------\n"
-			   "\t| 1. Ввести выражение      |\n"
-			   "\t| 0. Выход из программы    |\n"
-			   "\t----------------------------\n");
+		printf("\t-------------Меню-------------\n"
+			   "\t| 1. Ввести выражение        |\n"
+			   "\t| 2. Список доступных функций|\n"
+			   "\t| 0. Выход из программы      |\n"
+			   "\t------------------------------\n"
+		"\tВведите свой выбор: ");
 		scanf("%hu", &option);
 		int ch;
 		while ((ch = getchar()) != '\n' && ch != EOF) {} //fixing "\n" after choice: scanf gets all except "\n" and it remains in stdin, when getchar takes it and stdin stays clear
 		switch (option) {
 		case 0: exit(0);
 			break;
-		case 1: solve(main_stack, main_queue);
+		case 1: solve();
+			break;
+		case 2: print_func();
 			break;
 		default: printf("Неверно введенная команда\n");
 		}
