@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
+#define PI 3.14159265358979323846
 
 #include <stdio.h>
 #include <Windows.h>
@@ -103,14 +104,14 @@ void enqueue(queue* q, Tokens t) {
 	}
 	q_node->token = t;
 	q_node->next = NULL;
-	if (q->head == NULL)	q->head = q_node;
+	if (q->head == NULL) q->head = q_node;
 	else q->tail->next = q_node;
 	q->tail = q_node;
 }
 
 //functions to get a value from struct (because stack work on LIFO and queue FIFO, the value gets from the top of the stack and from the head of the queue)
 Tokens pop(stack* s) {
-	if (s == NULL) {
+	if (s->top == NULL) {
 		printf("Стэк пустой!\n");
 		exit(0);
 	}
@@ -123,7 +124,7 @@ Tokens pop(stack* s) {
 }
 
 Tokens dequeue(queue* q) {
-	if (q == NULL) {
+	if (q->head == NULL) {
 		printf("Очередь пуста!\n");
 		exit(0);
 	}
@@ -276,6 +277,59 @@ void shunting_yard(queue* out, stack* oper_stack, Tokens list[500], int tokens_c
 	while (oper_stack->top != NULL) enqueue(out, pop(oper_stack));
 }
 
+double result(queue* out) {
+	double left, right;
+	stack* temp_stack = (stack*)malloc(sizeof(stack));
+	temp_stack->top = NULL;
+	while (out->head != NULL) 
+	{
+		if (out->head->token.type == numbers) push(temp_stack, out->head->token);
+		else if (out->head->token.type == variables) 
+		{
+			printf("Введите значение переменной %s: ", out->head->token.text);
+			scanf("%lf\n", &out->head->token.value);
+			push(temp_stack, out->head->token);
+		}
+		else if (out->head->token.type == functions) 
+		{
+			left = pop(temp_stack).value;
+			if (strcmp(out->head->token.text, "sin") == 0) left = sin(left);
+			else if (strcmp(out->head->token.text, "cos") == 0) left = cos(left);
+			else if (strcmp(out->head->token.text, "tan") == 0) left = tan(left);
+			else if (strcmp(out->head->token.text, "cot") == 0) left = (cos(left) / sin(left));
+			else if (strcmp(out->head->token.text, "arcsin") == 0) left = asin(left);
+			else if (strcmp(out->head->token.text, "arccos") == 0) left = acos(left);
+			else if (strcmp(out->head->token.text, "arctan") == 0) left = atan(left);
+			else if (strcmp(out->head->token.text, "arccot") == 0) left = PI / 2 - atan(left);
+			else if (strcmp(out->head->token.text, "sqrt") == 0) left = sqrt(left);
+			out->head->token.value = left;
+			push(temp_stack, out->head->token);
+		}
+		else if (out->head->token.type == operators) 
+		{
+			if (out->head->token.text != '!') 
+			{
+				left = pop(temp_stack).value;
+				right = pop(temp_stack).value;
+				if (strcmp(out->head->token.text, "+") == 0) left = left + right;
+				else if (strcmp(out->head->token.text, "-") == 0) left = left - right;
+				else if (strcmp(out->head->token.text, "*") == 0) left = left * right;
+				else if (strcmp(out->head->token.text, "/") == 0) left = left / right;
+				else if (strcmp(out->head->token.text, "^") == 0) left = pow(left, right);
+			}
+			else 
+			{
+				left = pop(temp_stack).value;
+				double res = 1;
+				for (int i = 2; i < left; i++) res *= i;
+				out->head->token.value = res;
+				push(temp_stack, out->head->token);
+			}
+		}
+	}
+	return temp_stack->top->token.value;
+}
+
 void solve() {
 	char str[1000];
 
@@ -293,6 +347,8 @@ void solve() {
 	//main solving part
 	int tokens_count = tokenizer(str, token_list); //converting string into tokens
 	shunting_yard(main_queue, main_stack, token_list, tokens_count);
+	double answer = result(main_queue);
+	printf("Ответ: %lf\n", answer);
 }
 
 void print_func() {
