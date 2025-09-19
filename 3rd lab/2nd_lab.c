@@ -134,6 +134,14 @@ int dequeue(queue* q) {
 	return x;
 }
 
+void solve(stack* s, queue* q) {
+	char str[1000];
+	printf("Введите ваше выражение: ");
+	fgets(str, sizeof(str), stdin);
+	str[strcspn(str, "\n")] = '\0'; //another fixing of "\n", not getchar cause of using fgets except of scanf: strcspn find the first "\n" in str and replaces it with "\0"
+	printf("%s\n", str);
+}
+
 int main() {
 	setlocale(LC_ALL, "rus");
 	SetConsoleCP(1251);
@@ -148,12 +156,19 @@ int main() {
 	unsigned short option;
 
 	while (TRUE) {
-		printf("\t-------------Меню-----------\n"
+		printf("\t-----------Меню-------------\n"
 			   "\t| 1. Ввести выражение      |\n"
 			   "\t| 0. Выход из программы    |\n"
 			   "\t----------------------------\n");
 		scanf("%hu", &option);
 		int ch;
-		while ((ch = getchar()) != '\n' && ch != EOF) {} //fixing "\n" after choice
+		while ((ch = getchar()) != '\n' && ch != EOF) {} //fixing "\n" after choice: scanf gets all except "\n" and it remains in stdin, when getchar takes it and stdin stays clear
+		switch (option) {
+		case 0: exit(0);
+			break;
+		case 1: solve(main_stack, main_queue);
+			break;
+		default: printf("Неверно введенная команда\n");
+		}
 	}
 }
