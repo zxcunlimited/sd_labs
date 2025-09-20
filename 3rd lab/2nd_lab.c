@@ -16,7 +16,6 @@
 4) реализовать алгоритм сортировочной станции Дейкстры, который бы обрабатывал выражение в токенизированном виде
 5) реализовать вычисление выражения в польской нотации
 */
-
 /*
 устройство работы сортировочной станции Дейкстры:
 сочетает в себе использование двух структур: очереди и стека, очередь будет являться буфером в который будет собираться изначальное выражение в инфиксной нотации в постфиксную
@@ -42,7 +41,6 @@
 3) оператор унарный - достаем одно значение из стека, выполняем оператор или функцию и возвращаем в стек
 4)если в стеке остался всего один элемент - мы нашли результат
 */
-
 /*
 пример - 2 + 2 * 3
 1) Дейкстра: 
@@ -111,12 +109,11 @@ void enqueue(queue* q, Tokens t) {
 
 //functions to get a value from struct (because stack work on LIFO and queue FIFO, the value gets from the top of the stack and from the head of the queue)
 Tokens pop(stack* s) {
-	if (s->top == NULL) {
+	if (s == NULL || s->top == NULL) {
 		printf("Стэк пустой!\n");
 		exit(0);
 	}
-	node* temp = (node*)malloc(sizeof(node));
-	temp = s->top;
+	node* temp = s->top;
 	Tokens x = temp->token;
 	s->top = temp->next;
 	free(temp);
@@ -124,12 +121,11 @@ Tokens pop(stack* s) {
 }
 
 Tokens dequeue(queue* q) {
-	if (q->head == NULL) {
+	if (q == NULL || q->head == NULL) {
 		printf("Очередь пуста!\n");
 		exit(0);
 	}
-	node* temp = (node*)malloc(sizeof(node));
-	temp = q->head;
+	node* temp = q->head;
 	Tokens x = temp->token;
 	q->head = temp->next;
 	if (q->head == NULL) q->tail = NULL; //with the queue its quite harder, we need to check if after our manipulations the head is empty, if it is we know that the whole queue is empty now and need to null the tail too
@@ -227,21 +223,44 @@ int tokenizer(const char* str, Tokens list[500]) {
 	return tokens_count;
 }
 
-int get_priority(char operator) { //functions returns priority of operators that is important to shunting yard
-	if (operator == '!') return 4;
-	if (operator == '^') return 3;
-	if (operator == '*' || operator == '/') return 2;
-	if (operator == '+' || operator == '-') return 1;
+int get_priority(const char* operator) { //functions returns priority of operators that is important to shunting yard
+	char c = operator[0];
+	if (c == '!') return 4;
+	if (c == '^') return 3;
+	if (c == '*' || c == '/') return 2;
+	if (c == '+' || c == '-') return 1;
 	return 0;
 }
 
 typedef enum associativity {left, right} associativity;
 //using enum ecxept of standart 0, 1 makes understading what associativity have operator easier
-associativity get_associativity(char operator) {
-	if (operator == '!' || operator == '^') return right;
+associativity get_associativity(const char* operator) {
+	char c = operator[0];
+	if (c == '!' || c == '^') return right;
 	return left;
 }
+/* debug functions
+void print_queue(queue* q) {
+	node* current = q->head;
+	printf("Очередь: ");
+	while (current != NULL) {
+		printf("%s ", current->token.text); // предполагаем, что text — строка в Tokens
+		current = current->next;
+	}
+	printf("\n");
+}
 
+void print_stack(stack* s) {
+	node* current = s->top;
+	printf("Стек: ");
+	while (current != NULL) {
+		if (current->token.type == numbers) printf("%lf ", current->token.value);
+		else printf("%s ", current->token.text);
+		current = current->next;
+	}
+	printf("\n");
+}
+*/
 void shunting_yard(queue* out, stack* oper_stack, Tokens list[500], int tokens_count) {
 	for (int i = 0; i < tokens_count; i++) 
 	{
@@ -252,82 +271,114 @@ void shunting_yard(queue* out, stack* oper_stack, Tokens list[500], int tokens_c
 		}
 		else if (list[i].type == operators)
 		{ //подробное объяснение случая с операторами
-			if (oper_stack->top != NULL) //если вершина стека пуста то все просто - банально кладем новоприбывший оператор в стек
-			{  //если же нет, ситуация становится сложнее - нам нужно сравнить на приоритетность и ассоциативность новый и старый (в данный момент лежит на вершине стека)
-				while ((oper_stack->top->token.type == operators || oper_stack->top->token.type == functions) &&  //если на вершине стека оператор или функция - нужно провести сравнение по двум случаям
-					  (get_priority(oper_stack->top->token.text) > get_priority(list[i].text) ||  // 1 случай - новый оператор имеет приоритет меньше старого, тогда старый оператор переходит в очередь
-					  (get_priority(oper_stack->top->token.text) == get_priority(list[i].text) &&   // 2 случай - приоритеты равны, но тогда мы проводим проверку на ассоциативность
-					  get_associativity(list[i].text) == left))) // если новый оператор лево-ассоциативен, старый оператор идет в очередь
-				{
-					enqueue(out, pop(oper_stack));
-				}
+		   //если вершина стека пуста то все просто - банально кладем новоприбывший оператор в стек 
+			while ((oper_stack->top != NULL) && //если же нет, ситуация становится сложнее - нам нужно сравнить на приоритетность и ассоциативность новый и старый (в данный момент лежит на вершине стека)
+					(oper_stack->top->token.type == operators || oper_stack->top->token.type == functions) &&  //если на вершине стека оператор или функция - нужно провести сравнение по двум случаям
+					(get_priority(oper_stack->top->token.text) > get_priority(list[i].text) ||  // 1 случай - новый оператор имеет приоритет меньше старого, тогда старый оператор переходит в очередь
+					(get_priority(oper_stack->top->token.text) == get_priority(list[i].text) &&   // 2 случай - приоритеты равны, но тогда мы проводим проверку на ассоциативность
+					get_associativity(list[i].text) == left))) // если новый оператор лево-ассоциативен, старый оператор идет в очередь
+			{
+				enqueue(out, pop(oper_stack));
 			}
+			push(oper_stack, list[i]); //как только провели все нужные проверки - наконец толкаем новый оператор в стек
 		}
 		else if (list[i].type == left_brace) push(oper_stack, list[i]);
 		else if (list[i].type == right_brace) 
 		{
-			while (oper_stack->top->token.type != left_brace) 
+			while (oper_stack->top != NULL && oper_stack->top->token.type != left_brace) 
 			{
 				enqueue(out, pop(oper_stack));
 			}
+			if (oper_stack->top == NULL) {
+				printf("Неверно введенная скобочная последовательность!\n");
+				exit(0);
+			}
 			pop(oper_stack);
-			if (oper_stack->top->token.type == functions) enqueue(out, pop(oper_stack));
+			if (oper_stack->top != NULL && oper_stack->top->token.type == functions) enqueue(out, pop(oper_stack));
 		}
 	}
 	while (oper_stack->top != NULL) enqueue(out, pop(oper_stack));
 }
 
 double result(queue* out) {
-	double left, right;
 	stack* temp_stack = (stack*)malloc(sizeof(stack));
 	temp_stack->top = NULL;
 	while (out->head != NULL) 
 	{
-		if (out->head->token.type == numbers) push(temp_stack, out->head->token);
-		else if (out->head->token.type == variables) 
+		Tokens new = dequeue(out);
+		if (new.type == numbers) push(temp_stack, new);
+		else if (new.type == variables) 
 		{
-			printf("Введите значение переменной %s: ", out->head->token.text);
-			scanf("%lf\n", &out->head->token.value);
-			push(temp_stack, out->head->token);
+			printf("Введите значение переменной %s: ", new.text);
+			scanf("%lf", &new.value);
+			push(temp_stack, new);
 		}
-		else if (out->head->token.type == functions) 
+		else if (new.type == functions) 
 		{
-			left = pop(temp_stack).value;
-			if (strcmp(out->head->token.text, "sin") == 0) left = sin(left);
-			else if (strcmp(out->head->token.text, "cos") == 0) left = cos(left);
-			else if (strcmp(out->head->token.text, "tan") == 0) left = tan(left);
-			else if (strcmp(out->head->token.text, "cot") == 0) left = (cos(left) / sin(left));
-			else if (strcmp(out->head->token.text, "arcsin") == 0) left = asin(left);
-			else if (strcmp(out->head->token.text, "arccos") == 0) left = acos(left);
-			else if (strcmp(out->head->token.text, "arctan") == 0) left = atan(left);
-			else if (strcmp(out->head->token.text, "arccot") == 0) left = PI / 2 - atan(left);
-			else if (strcmp(out->head->token.text, "sqrt") == 0) left = sqrt(left);
-			out->head->token.value = left;
-			push(temp_stack, out->head->token);
-		}
-		else if (out->head->token.type == operators) 
-		{
-			if (out->head->token.text != '!') 
+			double x = pop(temp_stack).value;
+			if (strcmp(new.text, "sin") == 0) x = sin(x);
+			else if (strcmp(new.text, "cos") == 0) x = cos(x);
+			else if (strcmp(new.text, "tan") == 0) x = tan(x);
+			else if (strcmp(new.text, "cot") == 0) x = (cos(x) / sin(x));
+			else if (strcmp(new.text, "arcsin") == 0) x = asin(x);
+			else if (strcmp(new.text, "arccos") == 0) x = acos(x);
+			else if (strcmp(new.text, "arctan") == 0) x = atan(x);
+			else if (strcmp(new.text, "arccot") == 0) x = PI / 2.0 - atan(x);
+			else if (strcmp(new.text, "sqrt") == 0) 
 			{
-				left = pop(temp_stack).value;
-				right = pop(temp_stack).value;
-				if (strcmp(out->head->token.text, "+") == 0) left = left + right;
-				else if (strcmp(out->head->token.text, "-") == 0) left = left - right;
-				else if (strcmp(out->head->token.text, "*") == 0) left = left * right;
-				else if (strcmp(out->head->token.text, "/") == 0) left = left / right;
-				else if (strcmp(out->head->token.text, "^") == 0) left = pow(left, right);
+				if (x < 0) 
+				{
+					printf("Корень отрицательного числа не может быть высчитан\n");
+					exit(0);
+				}
+				else x = sqrt(x);
+			}
+			Tokens resTok = { numbers, "", x};
+			push(temp_stack, resTok);
+		}
+		else if (new.type == operators)
+		{
+			double res = 1;
+			if (strcmp(new.text, "!") != 0)
+			{
+				double right = pop(temp_stack).value;
+				double left = pop(temp_stack).value;
+				if (strcmp(new.text, "+") == 0) res = left + right;
+				else if (strcmp(new.text, "-") == 0) res = left - right;
+				else if (strcmp(new.text, "*") == 0) res = left * right;
+				else if (strcmp(new.text, "/") == 0)
+				{
+					if (right == 0) 
+					{
+						printf("Делить на ноль нельзя\n");
+						exit(0);
+					}
+					res = left / right;
+				}
+				else if (strcmp(new.text, "^") == 0) res = pow(left, right);
 			}
 			else 
 			{
-				left = pop(temp_stack).value;
-				double res = 1;
-				for (int i = 2; i < left; i++) res *= i;
-				out->head->token.value = res;
-				push(temp_stack, out->head->token);
+				double x = pop(temp_stack).value;
+				if (x < 0) 
+				{
+					printf("Факториал отрицательного числа не существует\n");
+					exit(0);
+				}
+				for (int i = 2; i <= x; i++) res *= i;
 			}
+			Tokens resTok = { numbers, "", res };
+			push(temp_stack, resTok);
+
 		}
 	}
-	return temp_stack->top->token.value;
+	double answer = pop(temp_stack).value;
+	if (temp_stack->top != NULL) 
+	{
+		printf("Ошибка: стек не пустой после вычислений\n");
+		exit(0);
+	}
+	return answer;
 }
 
 void solve() {
